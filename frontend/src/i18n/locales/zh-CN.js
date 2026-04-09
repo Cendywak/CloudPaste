@@ -25,7 +25,7 @@ export default {
   },
   markdown: {
     title: "Markdown 编辑器",
-    placeholder: "请输入Markdown内容...，对于代码：ctrl+shift+V粘贴原文，ctrl+V会被自动套上一层代码块",
+    placeholder: "请输入Markdown内容...",
     save: "保存",
     share: "分享",
     download: "下载",
@@ -81,7 +81,7 @@ export default {
   },
   textClipboard: {
     title: "文本剪贴板",
-    placeholder: "请输入Markdown内容...，对于代码：ctrl+shift+V粘贴原文，ctrl+V会被自动套上一层代码块",
+    placeholder: "请输入Markdown内容...",
     permissionRequired: "您需要登录管理员账号或使用有文本权限的API密钥。请",
     loginOrAuth: "登录/授权",
   },
