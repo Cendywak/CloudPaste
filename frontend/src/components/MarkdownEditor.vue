@@ -242,6 +242,7 @@ const props = defineProps({
 });
 
 let editor = null;
+let editorPasteContainer = null;
 const savingStatus = ref("");
 const isSubmitting = ref(false);
 const shareLink = ref("");
@@ -355,6 +356,33 @@ const getInputClasses = () => {
   return props.darkMode
       ? "bg-gray-800 border-gray-700 text-gray-100 focus:ring-primary-600 focus:border-primary-600"
       : "bg-white border-gray-300 text-gray-900 focus:ring-primary-500 focus:border-primary-500";
+};
+
+const handleEditorPaste = (event) => {
+  if (!editor || !event?.clipboardData) return;
+
+  const rawText = event.clipboardData.getData("text/plain");
+  if (typeof rawText !== "string") return;
+
+  event.preventDefault();
+  editor.insertValue(rawText);
+  autoSaveDebounce();
+};
+
+const bindEditorPasteHandler = () => {
+  unbindEditorPasteHandler();
+
+  const container = document.querySelector("#vditor .vditor-content") || document.querySelector("#vditor");
+  if (!container) return;
+
+  editorPasteContainer = container;
+  editorPasteContainer.addEventListener("paste", handleEditorPaste, true);
+};
+
+const unbindEditorPasteHandler = () => {
+  if (!editorPasteContainer) return;
+  editorPasteContainer.removeEventListener("paste", handleEditorPaste, true);
+  editorPasteContainer = null;
 };
 
 const initEditor = () => {
@@ -628,6 +656,7 @@ const initEditor = () => {
     after: () => {
       // 编辑器加载后，尝试保存在本地
       autoSave();
+      bindEditorPasteHandler();
 
       // 在暗色模式下进一步调整一些细节样式
       if (props.darkMode) {
@@ -656,6 +685,7 @@ watch(
     () => {
       if (editor) {
         const currentValue = editor.getValue();
+        unbindEditorPasteHandler();
         editor.destroy();
         initEditor();
         // 保留当前编辑的内容
@@ -887,6 +917,7 @@ onUnmounted(() => {
   // 销毁编辑器实例 - 添加安全检查
   try {
     if (editor) {
+      unbindEditorPasteHandler();
       // 检查是否有 destroy 方法并且 element 属性存在
       if (editor.destroy && editor.element) {
         editor.destroy();

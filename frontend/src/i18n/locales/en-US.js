@@ -24,7 +24,7 @@ export default {
   },
   markdown: {
     title: "Markdown Editor",
-    placeholder: "Please enter Markdown content... For code: use ctrl+shift+V to paste the original text, as ctrl+V will automatically wrap it in a code block.",
+    placeholder: "Please enter Markdown content...",
     save: "Save",
     share: "Share",
     download: "Download",
@@ -80,7 +80,7 @@ export default {
   },
   textClipboard: {
     title: "Text Clipboard",
-    placeholder: "Please enter Markdown content... For code: use ctrl+shift+V to paste the original text, as ctrl+V will automatically wrap it in a code block.",
+    placeholder: "Please enter Markdown content...",
     permissionRequired: "You need to login as admin or use an API key with text permission. Please",
     loginOrAuth: "login/authorize",
   },
