@@ -78,6 +78,12 @@ export default {
       maxViewsPlaceholder: "0 means unlimited",
     },
   },
+  textClipboard: {
+    title: "Text Clipboard",
+    placeholder: "Please enter Markdown content... For code: use ctrl+shift+V to paste the original text, as ctrl+V will automatically wrap it in a code block.",
+    permissionRequired: "You need to login as admin or use an API key with text permission. Please",
+    loginOrAuth: "login/authorize",
+  },
   file: {
     upload: "Upload File",
     select: "Select File",
