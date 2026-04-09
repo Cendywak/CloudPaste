@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watchEffect, onMounted, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
-import MarkdownEditor from "./components/MarkdownEditor.vue";
+import PlainTextEditor from "./components/PlainTextEditor.vue";
 import EnvSwitcher from "./components/EnvSwitcher.vue";
 import AdminPage from "./components/adminManagement/AdminPage.vue";
 import PasteView from "./components/PasteView.vue";
@@ -586,7 +586,7 @@ updateTheme();
     <main class="flex-1 flex flex-col">
       <!-- 根据当前活动页面显示不同内容 -->
       <div v-if="activePage === 'home'" class="transition-opacity duration-300 flex-1 flex flex-col" :class="{ 'opacity-0': transitioning }">
-        <MarkdownEditor :darkMode="isDarkMode" />
+        <PlainTextEditor :darkMode="isDarkMode" />
       </div>
       <div v-else-if="activePage === 'upload'" class="transition-opacity duration-300 flex-1 flex flex-col" :class="{ 'opacity-0': transitioning }">
         <FileUploadPage :darkMode="isDarkMode" />
