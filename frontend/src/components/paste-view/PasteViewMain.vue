@@ -1,11 +1,9 @@
 <script setup>
 // PasteViewMain组件 - 主组件，整合各个功能模块
-// 负责协调预览、大纲和编辑功能，管理全局状态和数据流
-import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from "vue";
+// 负责协调纯文本查看和编辑功能，管理全局状态和数据流
+import { ref, onMounted, onBeforeUnmount, watch, computed } from "vue";
 import { getPaste, getRawPasteUrl } from "../../api/pasteService";
 import { updatePaste } from "../../api/adminService";
-import PasteViewPreview from "./PasteViewPreview.vue";
-import PasteViewOutline from "./PasteViewOutline.vue";
 import PasteViewEditor from "./PasteViewEditor.vue";
 import { formatExpiry, debugLog } from "./PasteViewUtils";
 import { api } from "../../api";
@@ -40,20 +38,25 @@ const passwordInput = ref(""); // 密码输入框的值
 const needPassword = ref(false); // 是否需要密码
 const showPassword = ref(false); // 是否显示密码
 let mounted = false; // 组件是否已挂载
-const previewRef = ref(null); // 预览组件引用
 const editContent = ref(""); // 编辑内容
 
 // 视图模式设置
-const viewMode = ref("preview"); // 'preview', 'outline', 'edit'
+const viewMode = ref("preview"); // 'preview', 'edit'
 // 管理员权限判断
 const isAdmin = ref(false);
 // API密钥用户权限判断
 const hasApiKey = ref(false);
 const hasTextPermission = ref(false);
 const isCreator = ref(false);
-// 大纲相关数据
-const outlineData = ref([]); // 扁平结构大纲数据
-const outlineTreeData = ref([]); // 树形结构大纲数据
+
+// 内容统计 - 字符数和行数
+const contentStats = computed(() => {
+  const content = paste.value?.content || "";
+  return {
+    chars: Array.from(content).length,
+    lines: content ? content.split("\n").length : 0,
+  };
+});
 
 // 标记是否通过取消按钮退出编辑模式
 const isCancelling = ref(false);
@@ -263,81 +266,7 @@ const loadPaste = async (password = null) => {
   }
 };
 
-// 提取文档大纲 - 由预览组件渲染完成后调用
-// 分析DOM结构生成大纲数据
-const extractOutline = () => {
-  const previewElement = document.querySelector(".vditor-reset");
-  if (!previewElement) return;
-
-  // 获取所有标题元素
-  const headings = previewElement.querySelectorAll("h1, h2, h3, h4, h5, h6");
-  const outline = [];
-
-  // 构建嵌套大纲结构
-  const outlineTree = [];
-  let currentParents = []; // 用于存储每个级别的当前父项
-
-  headings.forEach((heading) => {
-    // 获取标题级别、文本和ID
-    const level = parseInt(heading.tagName.substring(1));
-    const text = heading.textContent;
-    const id = heading.id;
-
-    // 创建大纲项对象
-    const item = {
-      level,
-      text,
-      id,
-      children: [],
-      expanded: true, // 默认展开
-    };
-
-    // 确定此标题在大纲中的位置 - 构建层级关系
-    if (level === 1) {
-      // 一级标题直接添加到大纲树根
-      outlineTree.push(item);
-      currentParents = [item]; // 重置所有父级
-    } else {
-      // 找到当前标题的父标题
-      let parentLevel = level - 1;
-      while (parentLevel >= 1) {
-        if (currentParents[parentLevel - 1]) {
-          // 将当前项添加到找到的父项的子项中
-          currentParents[parentLevel - 1].children.push(item);
-          break;
-        }
-        parentLevel--;
-      }
-
-      // 如果没有找到合适的父级，则添加到根级
-      if (parentLevel < 1) {
-        outlineTree.push(item);
-      }
-
-      // 更新当前级别的父项
-      currentParents[level - 1] = item;
-      // 清除所有更高级别的父项
-      for (let i = level; i < 6; i++) {
-        currentParents[i] = null;
-      }
-    }
-
-    // 同时保留扁平结构用于兼容性
-    outline.push(item);
-  });
-
-  // 更新大纲数据状态
-  outlineData.value = outline;
-  outlineTreeData.value = outlineTree;
-  debugLog(enableDebug.value, isDev, "提取大纲数据:", outline.length, "项");
-};
-
-// 处理预览组件内容渲染完成事件
-const handlePreviewRendered = () => {
-  extractOutline();
-};
-
-// 切换大纲/预览/编辑模式
+// 切换预览/编辑模式
 const switchViewMode = (mode) => {
   // 如果当前是编辑模式，只能通过保存或取消按钮切换到预览模式
   if (viewMode.value === "edit" && mode !== "preview") {
@@ -353,16 +282,6 @@ const switchViewMode = (mode) => {
   }
 
   viewMode.value = mode;
-};
-
-// 点击大纲项时滚动到对应位置
-const scrollToHeading = (id) => {
-  if (!id) return;
-
-  const element = document.getElementById(id);
-  if (element) {
-    element.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
 };
 
 // 保存编辑内容 - 调用API更新文本分享
@@ -726,7 +645,7 @@ const handleStorageChange = (e) => {
       <!-- 文本内容显示区域 - 主要内容容器 -->
       <div v-if="paste && !needPassword && !(error && !error.includes('成功') && !needPassword)" class="mt-6">
         <!-- 元信息显示区域 - 显示过期时间和剩余查看次数 -->
-        <div class="mb-6 p-5 border rounded-lg" :class="darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'">
+        <div v-if="paste.expiresAt || paste.maxViews" class="mb-6 p-5 border rounded-lg" :class="darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'">
           <div class="grid grid-cols-1 gap-4 text-sm">
             <div v-if="paste.expiresAt">
               <span :class="darkMode ? 'text-gray-400' : 'text-gray-500'">过期时间:</span>
@@ -752,39 +671,8 @@ const handleStorageChange = (e) => {
 
         <!-- 视图模式切换和操作按钮区域 -->
         <div class="mb-4 flex items-center justify-between flex-wrap gap-2">
-          <!-- 视图模式切换按钮组 - 在编辑模式下隐藏 -->
-          <div v-if="viewMode !== 'edit'" class="flex border rounded-md overflow-hidden" :class="darkMode ? 'border-gray-700' : 'border-gray-200'">
-            <button
-              @click="switchViewMode('preview')"
-              class="px-3 py-1.5 text-sm font-medium"
-              :class="[
-                viewMode === 'preview'
-                  ? darkMode
-                    ? 'bg-gray-700 text-white'
-                    : 'bg-gray-100 text-gray-900'
-                  : darkMode
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                  : 'bg-white text-gray-700 hover:bg-gray-50',
-              ]"
-            >
-              预览
-            </button>
-            <button
-              @click="switchViewMode('outline')"
-              class="px-3 py-1.5 text-sm font-medium"
-              :class="[
-                viewMode === 'outline'
-                  ? darkMode
-                    ? 'bg-gray-700 text-white'
-                    : 'bg-gray-100 text-gray-900'
-                  : darkMode
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                  : 'bg-white text-gray-700 hover:bg-gray-50',
-              ]"
-            >
-              大纲
-            </button>
-          </div>
+          <!-- 内容统计 - 在编辑模式下隐藏 -->
+          <div v-if="viewMode !== 'edit'" class="text-sm" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ contentStats.chars }} 字符 · {{ contentStats.lines }} 行</div>
           <!-- 编辑模式下显示固定标题 -->
           <div v-else class="text-sm font-medium" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">编辑模式 - 请使用下方按钮保存或取消</div>
 
@@ -846,8 +734,6 @@ const handleStorageChange = (e) => {
             <summary class="cursor-pointer text-yellow-700 dark:text-yellow-300">调试信息</summary>
             <div class="mt-2 whitespace-pre-wrap text-gray-700 dark:text-gray-300 break-all">
               <div>内容长度: {{ paste.content?.length || 0 }}字符</div>
-              <div>预览组件: {{ previewRef ? "已引用" : "未引用" }}</div>
-              <div>大纲项数: {{ outlineData.length }}</div>
               <div>是否管理员: {{ isAdmin ? "是" : "否" }}</div>
               <div>是否有API密钥: {{ hasApiKey ? "是" : "否" }}</div>
               <div>是否有文本权限: {{ hasTextPermission ? "是" : "否" }}</div>
@@ -862,29 +748,8 @@ const handleStorageChange = (e) => {
 
         <!-- 内容区域 - 根据不同模式显示不同的内容 -->
         <div class="border rounded-lg shadow-sm overflow-hidden" :class="darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'">
-          <!-- 常规预览模式 - 显示Markdown渲染结果 -->
-          <div v-if="viewMode === 'preview'" class="p-6">
-            <PasteViewPreview ref="previewRef" :dark-mode="darkMode" :content="paste.content" :is-dev="isDev" :enable-debug="enableDebug" @rendered="handlePreviewRendered" />
-          </div>
-
-          <!-- 大纲预览模式 - 左侧显示大纲，右侧显示内容 -->
-          <div v-else-if="viewMode === 'outline'">
-            <PasteViewOutline
-              :dark-mode="darkMode"
-              :outline-data="outlineData"
-              :outline-tree-data="outlineTreeData"
-              :content="paste.content"
-              :is-dev="isDev"
-              :enable-debug="enableDebug"
-              @heading-click="scrollToHeading"
-            >
-              <template #content>
-                <div class="content-scroll flex-1 p-4 overflow-y-auto md:absolute md:inset-0">
-                  <PasteViewPreview :dark-mode="darkMode" :content="paste.content" :is-dev="isDev" :enable-debug="enableDebug" @rendered="handlePreviewRendered" />
-                </div>
-              </template>
-            </PasteViewOutline>
-          </div>
+          <!-- 预览模式 - 原样显示文本，不做任何格式渲染 -->
+          <pre v-if="viewMode === 'preview'" class="paste-content p-6">{{ paste.content }}</pre>
 
           <!-- 编辑模式 - 显示编辑器和相关配置表单 -->
           <div v-else-if="viewMode === 'edit'" class="flex flex-col p-6">
@@ -894,8 +759,6 @@ const handleStorageChange = (e) => {
               :paste="paste"
               :loading="loading"
               :error="error"
-              :is-dev="isDev"
-              :enable-debug="enableDebug"
               @save="saveEdit"
               @cancel="cancelEdit"
               @update:error="(val) => (error = val)"
@@ -912,6 +775,17 @@ const handleStorageChange = (e) => {
 .paste-view {
   min-height: 500px;
   width: 100%;
+}
+
+/* 文本内容原样显示：保留空格、制表符和换行，长行自动折行 */
+.paste-content {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  tab-size: 4;
 }
 
 /* 隐藏密码框的浏览器自带眼睛图标 */

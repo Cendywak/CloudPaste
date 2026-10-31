@@ -23,8 +23,8 @@ export default {
     copyright: "CloudPaste © {year} - Securely share your content",
   },
   markdown: {
-    title: "Markdown Editor",
-    placeholder: "Please enter Markdown content...",
+    title: "Text Share",
+    placeholder: "Paste or type text here. It is saved exactly as is...",
     save: "Save",
     share: "Share",
     download: "Download",
@@ -80,7 +80,7 @@ export default {
   },
   textClipboard: {
     title: "Text Clipboard",
-    placeholder: "Please enter Markdown content...",
+    placeholder: "Paste or type text here. It is saved exactly as is...",
     permissionRequired: "You need to login as admin or use an API key with text permission. Please",
     loginOrAuth: "login/authorize",
   },

@@ -9,12 +9,12 @@
       class="mb-4 p-3 rounded-md bg-yellow-50 border border-yellow-200 text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-700/50 dark:text-yellow-200"
     >
       <div class="flex items-center">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <span>
           {{ $t("markdown.permissionRequired") }}
-          <a href="#" class="font-medium underline" @click.prevent="navigateToAdmin">{{ $t("markdown.loginOrAuth") }}</a>。
+          <a href="#" class="font-medium underline" @click.prevent="navigateToAdmin">{{ $t("markdown.loginOrAuth") }}</a>
         </span>
       </div>
     </div>
@@ -22,10 +22,12 @@
     <div class="editor-wrapper">
       <textarea
         v-model="content"
-        class="w-full border rounded-lg p-3 min-h-[420px] sm:min-h-[520px] resize-y"
+        v-bind="rawTextareaAttrs"
+        class="plain-textarea w-full border rounded-lg p-3 min-h-[420px] sm:min-h-[520px] resize-y focus:outline-none focus:ring-2"
         :class="getInputClasses()"
         :placeholder="$t('markdown.placeholder')"
         :disabled="!hasPermission || isSubmitting"
+        @keydown="insertTabOnKeydown"
       />
     </div>
 
@@ -90,7 +92,7 @@
         </button>
 
         <div v-if="savingStatus" class="saving-status ml-auto text-sm">
-          <span :class="[isErrorMessage(savingStatus) ? (darkMode ? 'text-red-400' : 'text-red-600') : darkMode ? 'text-gray-300' : 'text-gray-600']">{{ savingStatus }}</span>
+          <span :class="[statusIsError ? (darkMode ? 'text-red-400' : 'text-red-600') : darkMode ? 'text-gray-300' : 'text-gray-600']">{{ savingStatus }}</span>
         </div>
       </div>
 
@@ -132,10 +134,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, defineProps } from "vue";
+import { ref, watch, onMounted, onUnmounted, defineProps } from "vue";
 import { useI18n } from "vue-i18n";
 import { createPaste, getRawPasteUrl } from "../api/pasteService";
 import { ApiStatus } from "../api/ApiStatus";
+import { rawTextareaAttrs, insertTabOnKeydown } from "../utils/plainText";
 
 const { t } = useI18n();
 
@@ -148,6 +151,7 @@ const props = defineProps({
 
 const content = ref("");
 const savingStatus = ref("");
+const statusIsError = ref(false);
 const isSubmitting = ref(false);
 const shareLink = ref("");
 const countdown = ref(15);
@@ -299,8 +303,9 @@ const validateMaxViews = (event) => {
   }
 };
 
-const isErrorMessage = (message) => {
-  return message.includes("失败") || message.includes("错误") || message.includes("链接后缀已被占用") || message.includes("不能");
+const setStatus = (message, isError = false) => {
+  savingStatus.value = message;
+  statusIsError.value = isError;
 };
 
 const startCountdown = () => {
@@ -332,22 +337,22 @@ const resetForm = () => {
 const saveContent = async () => {
   await checkPermissionStatus();
   if (!hasPermission.value) {
-    savingStatus.value = t("markdown.errorNoPermission");
+    setStatus(t("markdown.errorNoPermission"), true);
     return;
   }
 
   if (!validateCustomLink()) {
-    savingStatus.value = slugError.value;
+    setStatus(slugError.value, true);
     return;
   }
 
   if (!content.value || content.value.trim() === "") {
-    savingStatus.value = t("markdown.errorEmptyContent");
+    setStatus(t("markdown.errorEmptyContent"), true);
     return;
   }
 
   isSubmitting.value = true;
-  savingStatus.value = t("markdown.creatingShare");
+  setStatus(t("markdown.creatingShare"));
 
   try {
     const pasteData = {
@@ -369,7 +374,7 @@ const saveContent = async () => {
     shareLink.value = `${window.location.origin}/paste/${result.slug}`;
     currentSharePassword.value = formData.value.password || "";
 
-    savingStatus.value = t("markdown.shareCreatedSuccess");
+    setStatus(t("markdown.shareCreatedSuccess"));
     startCountdown();
     content.value = "";
     resetForm();
@@ -385,9 +390,9 @@ const saveContent = async () => {
         localStorage.removeItem("api_key_permissions");
         await checkPermissionStatus();
       }
-      savingStatus.value = t("markdown.errorPermissionDenied");
+      setStatus(t("markdown.errorPermissionDenied"), true);
     } else {
-      savingStatus.value = `${t("markdown.errorPrefix")}: ${error.message || t("markdown.errorCreateShareFailed")}`;
+      setStatus(`${t("markdown.errorPrefix")}: ${error.message || t("markdown.errorCreateShareFailed")}`, true);
     }
   } finally {
     isSubmitting.value = false;
@@ -400,13 +405,13 @@ const copyShareLink = () => {
   navigator.clipboard
     .writeText(shareLink.value)
     .then(() => {
-      savingStatus.value = t("markdown.linkCopied");
+      setStatus(t("markdown.linkCopied"));
       setTimeout(() => {
-        savingStatus.value = "";
+        setStatus("");
       }, 2000);
     })
     .catch(() => {
-      savingStatus.value = t("markdown.copyFailed");
+      setStatus(t("markdown.copyFailed"), true);
     });
 };
 
@@ -419,13 +424,13 @@ const copyRawTextLink = () => {
   navigator.clipboard
     .writeText(rawLink)
     .then(() => {
-      savingStatus.value = t("markdown.rawLinkCopied");
+      setStatus(t("markdown.rawLinkCopied"));
       setTimeout(() => {
-        savingStatus.value = "";
+        setStatus("");
       }, 2000);
     })
     .catch(() => {
-      savingStatus.value = t("markdown.copyFailed");
+      setStatus(t("markdown.copyFailed"), true);
     });
 };
 
@@ -438,17 +443,34 @@ const handlePermissionUpdate = async () => {
   await checkPermissionStatus();
 };
 
-onMounted(async () => {
-  await checkPermissionStatus();
+const DRAFT_KEY = "cloudpaste-content";
 
-  content.value = localStorage.getItem("cloudpaste-content") || "";
+const loadDraft = () => {
+  try {
+    return localStorage.getItem(DRAFT_KEY) || "";
+  } catch {
+    return "";
+  }
+};
+
+watch(content, (value) => {
+  try {
+    localStorage.setItem(DRAFT_KEY, value || "");
+  } catch {
+    // 存储不可用时忽略，不影响编辑
+  }
+});
+
+onMounted(async () => {
+  content.value = loadDraft();
+
+  await checkPermissionStatus();
 
   window.addEventListener("storage", handlePermissionUpdate);
   window.addEventListener("api-key-permissions-updated", handlePermissionUpdate);
 });
 
 onUnmounted(() => {
-  localStorage.setItem("cloudpaste-content", content.value || "");
   if (countdownTimer) {
     clearInterval(countdownTimer);
   }
@@ -457,3 +479,17 @@ onUnmounted(() => {
   window.removeEventListener("api-key-permissions-updated", handlePermissionUpdate);
 });
 </script>
+
+<style scoped>
+.plain-textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  tab-size: 4;
+}
+
+/* 输入框与下拉框统一高度，保持同一行对齐 */
+.form-input {
+  height: 2.5rem;
+}
+</style>
