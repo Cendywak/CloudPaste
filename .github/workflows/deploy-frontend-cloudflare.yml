@@ -6,6 +6,7 @@ on:
     paths:
       - "frontend/**"
       - "!frontend/vercel.json"
+      - ".github/workflows/deploy-frontend-cloudflare.yml"
   workflow_dispatch:
   repository_dispatch:
     types: [deploy-button]
@@ -24,12 +25,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: "./frontend/package-lock.json"
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Test Pages proxy
+        run: npm run test:pages
 
       - name: Check if deploy button trigger
         id: check-deploy-button
@@ -45,11 +49,12 @@ jobs:
         env:
           VITE_APP_ENV: production
           VITE_ENABLE_DEVTOOLS: false
+          VITE_BACKEND_PROXY: "true"
 
-      - name: Copy Cloudflare Functions
-        run: |
-          mkdir -p dist/functions
-          cp -r functions/* dist/functions/ || echo "No functions directory found"
+      # Wrangler compiles frontend/functions from the project root.
+      # Never copy Functions source into dist, where it would be a public asset.
+      - name: Validate Pages Functions build
+        run: npm run check:pages
 
       - name: Check if Pages project exists
         id: check-project
@@ -101,6 +106,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: "./frontend"
+          wranglerVersion: "4.166.0"
           command: "pages deploy ./dist --project-name=cloudpaste-frontend --branch production"
 
       - name: Display Success Information
@@ -110,10 +116,9 @@ jobs:
           echo "🎉 CloudPaste 前端已成功部署到 Cloudflare Pages!"
           echo "===================================================="
           echo ""
-          echo "注意: 您需要在 Cloudflare Pages 控制面板中手动设置环境变量:"
-          echo "- 登录 https://dash.cloudflare.com/"
-          echo "- 进入 Pages > cloudpaste-frontend > Settings > Environment variables"
-          echo "- 添加 VITE_BACKEND_URL = 您的后端Worker URL"
+          echo "API 通过 Pages Functions 的 BACKEND Service Binding 内部调用 Worker。"
+          echo "绑定在 frontend/wrangler.toml 配置；不需要 VITE_BACKEND_URL。"
+          echo "确认 Pages API、登录、下载和 WebDAV 可用后，再关闭 Worker 公网入口。"
           echo ""
           echo "后续步骤："
           echo "1. 访问您的 Cloudflare Pages URL"

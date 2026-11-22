@@ -14,6 +14,12 @@ const isDockerEnvironment = () => {
 
 // 优先从全局配置读取，然后根据环境选择不同的回退策略
 function getApiBaseUrl() {
+  // Pages builds always use their own origin, even if config.js fails to load
+  // or this browser has an old Worker URL saved in localStorage.
+  if (typeof window !== "undefined" && (import.meta.env.VITE_BACKEND_PROXY === "true" || window.appConfig?.backendProxy === true)) {
+    return window.location.origin;
+  }
+
   // 首先检查运行时配置 (window.appConfig) - 所有环境通用
   if (typeof window !== "undefined" && window.appConfig && window.appConfig.backendUrl) {
     const runtimeUrl = window.appConfig.backendUrl;

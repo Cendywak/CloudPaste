@@ -1,0 +1,14 @@
+name = "cloudpaste-frontend"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-11-22"
+
+# This is a Worker service name, not a public URL. Keep it in the same account.
+# Configuration is managed here, including the production binding.
+[[services]]
+binding = "BACKEND"
+service = "cloudpaste-backend"
+
+# Preview deployments must not have access to production data.
+# Bind a separate test Worker here before testing backend-dependent previews.
+[env.preview]
+services = []
