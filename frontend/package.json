@@ -8,6 +8,8 @@
     "build": "vite build",
     "vercel-build": "node vercel-build.cjs && vite build",
     "preview": "vite preview",
+    "test:pages": "node --test tests/pages-proxy.test.js",
+    "check:pages": "npx --yes wrangler@4.166.0 pages functions build --outdir .wrangler/pages-build",
     "clean": "node clean-deps.js"
   },
   "dependencies": {
